@@ -21,7 +21,8 @@ export async function POST(req: NextRequest) {
         Accept: "text/html,application/xhtml+xml",
       },
     });
-  } catch {
+  } catch (err) {
+    console.error("[fetch-article]", err);
     return NextResponse.json(
       { error: "記事の取得に失敗したのだ。URLを確認してほしいのだ" },
       { status: 400 }
