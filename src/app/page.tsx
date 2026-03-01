@@ -77,6 +77,7 @@ export default function Home() {
       setAudioUrl(objectUrl);
       setStep("done");
     } catch (err) {
+      console.error("[handleSubmit]", err);
       setError(err instanceof Error ? err.message : "予期しないエラーが発生したのだ");
       setStep("error");
     }
