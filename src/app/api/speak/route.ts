@@ -54,11 +54,14 @@ export async function POST(req: NextRequest) {
         "Content-Length": audioBuffer.byteLength.toString(),
       },
     });
-  } catch {
+  } catch (err) {
+    console.error("[speak]", err);
+    const isConnectionError = err instanceof TypeError;
     return NextResponse.json(
       {
-        error:
-          "VOICEVOXに繋がらなかったのだ。Dockerが起動しているか確認してほしいのだ",
+        error: isConnectionError
+          ? "VOICEVOXに繋がらなかったのだ。Dockerが起動しているか確認してほしいのだ"
+          : "音声合成でエラーが発生したのだ",
       },
       { status: 503 }
     );
