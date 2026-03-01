@@ -31,12 +31,24 @@ ${text}
       stream: false,
     });
 
-    return NextResponse.json({ summary: response.message.content });
-  } catch {
+    const content = response.message?.content;
+    if (typeof content !== "string") {
+      console.error("[summarize] Unexpected response shape:", response);
+      return NextResponse.json(
+        { error: "モデルの応答が不正なのだ" },
+        { status: 502 }
+      );
+    }
+
+    return NextResponse.json({ summary: content });
+  } catch (err) {
+    console.error("[summarize]", err);
+    const isConnectionError = err instanceof TypeError;
     return NextResponse.json(
       {
-        error:
-          "要約に失敗したのだ。Ollamaが起動しているか確認してほしいのだ（ollama serve）",
+        error: isConnectionError
+          ? "Ollamaに接続できなかったのだ。ollama serve を確認してほしいのだ"
+          : "要約に失敗したのだ。Ollamaが起動しているか確認してほしいのだ（ollama serve）",
       },
       { status: 503 }
     );
