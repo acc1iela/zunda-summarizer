@@ -6,6 +6,9 @@ const VOICEVOX_BASE = process.env.VOICEVOX_BASE_URL ?? "http://localhost:50021";
 // 他: あまあま=1, ツンツン=7, セクシー=5, ささやき=22
 const SPEAKER_ID = 3;
 
+// URL長制限対策。要約は通常 200-400 字なのでこの上限で切れることはほぼない
+const MAX_SPEAK_LENGTH = 500;
+
 export async function POST(req: NextRequest) {
   const { text } = await req.json();
 
@@ -13,10 +16,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "テキストが必要なのだ" }, { status: 400 });
   }
 
+  const speakText = text.slice(0, MAX_SPEAK_LENGTH);
+
   try {
     // Step 1: audio_query でテキスト→音声パラメータJSONを生成
     const queryRes = await fetch(
-      `${VOICEVOX_BASE}/audio_query?text=${encodeURIComponent(text)}&speaker=${SPEAKER_ID}`,
+      `${VOICEVOX_BASE}/audio_query?text=${encodeURIComponent(speakText)}&speaker=${SPEAKER_ID}`,
       { method: "POST" }
     );
 
