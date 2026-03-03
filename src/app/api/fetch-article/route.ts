@@ -5,11 +5,21 @@ import { Readability } from "@mozilla/readability";
 // 長すぎる記事はLLMのコンテキスト制限に引っかかるので上限を設ける
 const MAX_TEXT_LENGTH = 8000;
 
+// 同一URLの再フェッチを避けるための簡易メモリキャッシュ（5分TTL）
+const CACHE_TTL_MS = 5 * 60 * 1000;
+type CacheEntry = { title: string; text: string; expiresAt: number };
+const articleCache = new Map<string, CacheEntry>();
+
 export async function POST(req: NextRequest) {
   const { url } = await req.json();
 
   if (!url || typeof url !== "string") {
     return NextResponse.json({ error: "URLが必要なのだ" }, { status: 400 });
+  }
+
+  const cached = articleCache.get(url);
+  if (cached && cached.expiresAt > Date.now()) {
+    return NextResponse.json({ title: cached.title, text: cached.text });
   }
 
   let response: Response;
@@ -49,6 +59,8 @@ export async function POST(req: NextRequest) {
   }
 
   const text = article.textContent.replace(/\s+/g, " ").trim().slice(0, MAX_TEXT_LENGTH);
+
+  articleCache.set(url, { title: article.title, text, expiresAt: Date.now() + CACHE_TTL_MS });
 
   return NextResponse.json({ title: article.title, text });
 }
