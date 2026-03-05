@@ -19,8 +19,10 @@ export default function Home() {
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [captionUrl, setCaptionUrl] = useState<string | null>(null);
   const [error, setError] = useState("");
   const prevAudioUrl = useRef<string | null>(null);
+  const prevCaptionUrl = useRef<string | null>(null);
 
   const isLoading = step === "fetching" || step === "summarizing" || step === "speaking";
 
@@ -30,12 +32,17 @@ export default function Home() {
     setSummary("");
     setTitle("");
 
-    // 前の音声URLを解放してメモリリークを防ぐ
+    // 前の音声・字幕URLを解放してメモリリークを防ぐ
     if (prevAudioUrl.current) {
       URL.revokeObjectURL(prevAudioUrl.current);
       prevAudioUrl.current = null;
     }
+    if (prevCaptionUrl.current) {
+      URL.revokeObjectURL(prevCaptionUrl.current);
+      prevCaptionUrl.current = null;
+    }
     setAudioUrl(null);
+    setCaptionUrl(null);
 
     try {
       // Step 1: 記事取得
@@ -74,7 +81,15 @@ export default function Home() {
       const audioBlob = await speakRes.blob();
       const objectUrl = URL.createObjectURL(audioBlob);
       prevAudioUrl.current = objectUrl;
+
+      // 音声の字幕として要約テキストを WebVTT に変換
+      const vtt = `WEBVTT\n\n00:00:00.000 --> 99:59:59.999\n${sumData.summary}`;
+      const captionBlob = new Blob([vtt], { type: "text/vtt" });
+      const captionObjectUrl = URL.createObjectURL(captionBlob);
+      prevCaptionUrl.current = captionObjectUrl;
+
       setAudioUrl(objectUrl);
+      setCaptionUrl(captionObjectUrl);
       setStep("done");
     } catch (err) {
       console.error("[handleSubmit]", err);
@@ -169,8 +184,11 @@ export default function Home() {
             <p className="text-xs text-emerald-600 mb-2 font-medium">
               ずんだもんの音声
             </p>
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <audio controls autoPlay src={audioUrl} className="w-full" />
+            <audio controls autoPlay src={audioUrl} className="w-full">
+              {captionUrl && (
+                <track kind="captions" src={captionUrl} srcLang="ja" label="日本語" default />
+              )}
+            </audio>
           </div>
         )}
 
