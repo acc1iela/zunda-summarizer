@@ -151,6 +151,15 @@ export default function Home() {
             <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
               {summary}
             </p>
+            <div className="mt-4 pt-3 border-t border-emerald-100 flex justify-end">
+              <a
+                href={`data:text/plain;charset=utf-8,${encodeURIComponent(summary)}`}
+                download="summary.txt"
+                className="text-xs text-emerald-600 hover:text-emerald-800 underline transition-colors"
+              >
+                テキストをダウンロード
+              </a>
+            </div>
           </div>
         )}
 
