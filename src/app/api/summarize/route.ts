@@ -7,6 +7,8 @@ const ollama = new Ollama({
 
 const MODEL = process.env.OLLAMA_MODEL ?? "gemma3:4b";
 
+const OLLAMA_TIMEOUT_MS = 120_000;
+
 export async function POST(req: NextRequest) {
   const { title, text } = await req.json();
 
@@ -25,11 +27,21 @@ ${text}
 要約（ずんだもんの口調で）:`;
 
   try {
-    const response = await ollama.chat({
-      model: MODEL,
-      messages: [{ role: "user", content: prompt }],
-      stream: false,
-    });
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => {
+        const err = new Error(`Timeout after ${OLLAMA_TIMEOUT_MS}ms`);
+        err.name = "TimeoutError";
+        reject(err);
+      }, OLLAMA_TIMEOUT_MS)
+    );
+    const response = await Promise.race([
+      ollama.chat({
+        model: MODEL,
+        messages: [{ role: "user", content: prompt }],
+        stream: false,
+      }),
+      timeoutPromise,
+    ]);
 
     const content = response.message?.content;
     if (typeof content !== "string") {
@@ -43,14 +55,17 @@ ${text}
     return NextResponse.json({ summary: content });
   } catch (err) {
     console.error("[summarize]", err);
-    const isConnectionError = err instanceof TypeError;
+    const isTimeoutError = err instanceof Error && err.name === "TimeoutError";
+    const isConnectionError = !isTimeoutError && err instanceof TypeError;
     return NextResponse.json(
       {
-        error: isConnectionError
+        error: isTimeoutError
+          ? `Ollamaの応答が${OLLAMA_TIMEOUT_MS / 1000}秒でタイムアウトしたのだ。モデルが重すぎる可能性があるのだ`
+          : isConnectionError
           ? "Ollamaに接続できなかったのだ。ollama serve を確認してほしいのだ"
           : "要約に失敗したのだ。Ollamaが起動しているか確認してほしいのだ（ollama serve）",
       },
-      { status: 503 }
+      { status: isTimeoutError ? 504 : 503 }
     );
   }
 }
