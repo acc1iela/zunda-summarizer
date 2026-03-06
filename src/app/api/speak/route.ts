@@ -9,6 +9,8 @@ const SPEAKER_ID = 3;
 // URL長制限対策。要約は通常 200-400 字なのでこの上限で切れることはほぼない
 const MAX_SPEAK_LENGTH = 500;
 
+const VOICEVOX_TIMEOUT_MS = 30_000;
+
 export async function POST(req: NextRequest) {
   const { text } = await req.json();
 
@@ -22,7 +24,7 @@ export async function POST(req: NextRequest) {
     // Step 1: audio_query でテキスト→音声パラメータJSONを生成
     const queryRes = await fetch(
       `${VOICEVOX_BASE}/audio_query?text=${encodeURIComponent(speakText)}&speaker=${SPEAKER_ID}`,
-      { method: "POST" }
+      { method: "POST", signal: AbortSignal.timeout(VOICEVOX_TIMEOUT_MS) }
     );
 
     if (!queryRes.ok) {
@@ -41,6 +43,7 @@ export async function POST(req: NextRequest) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(query),
+        signal: AbortSignal.timeout(VOICEVOX_TIMEOUT_MS),
       }
     );
 
@@ -61,14 +64,17 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error("[speak]", err);
-    const isConnectionError = err instanceof TypeError;
+    const isTimeoutError = err instanceof Error && err.name === "TimeoutError";
+    const isConnectionError = !isTimeoutError && err instanceof TypeError;
     return NextResponse.json(
       {
-        error: isConnectionError
+        error: isTimeoutError
+          ? `VOICEVOXの応答が${VOICEVOX_TIMEOUT_MS / 1000}秒でタイムアウトしたのだ`
+          : isConnectionError
           ? "VOICEVOXに繋がらなかったのだ。Dockerが起動しているか確認してほしいのだ"
           : "音声合成でエラーが発生したのだ",
       },
-      { status: 503 }
+      { status: isTimeoutError ? 504 : 503 }
     );
   }
 }
