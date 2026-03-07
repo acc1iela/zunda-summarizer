@@ -1,6 +1,14 @@
 import { POST } from "@/app/api/fetch-article/route";
 import { NextRequest } from "next/server";
 
+// ファイルシステムキャッシュをモック（テストでは常にキャッシュミス）
+jest.mock("fs/promises", () => ({
+  readFile: jest.fn().mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" })),
+  writeFile: jest.fn().mockResolvedValue(undefined),
+  mkdir: jest.fn().mockResolvedValue(undefined),
+  unlink: jest.fn().mockResolvedValue(undefined),
+}));
+
 const mockParse = jest.fn();
 
 jest.mock("jsdom", () => ({
