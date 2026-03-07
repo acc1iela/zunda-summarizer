@@ -2,6 +2,36 @@ import { NextRequest, NextResponse } from "next/server";
 
 const VOICEVOX_BASE = process.env.VOICEVOX_BASE_URL ?? "http://localhost:50021";
 
+// VOICEVOX /audio_query レスポンスの型定義
+type Mora = {
+  text: string;
+  consonant?: string;
+  consonant_length?: number;
+  vowel: string;
+  vowel_length: number;
+  pitch: number;
+};
+
+type AccentPhrase = {
+  moras: Mora[];
+  accent: number;
+  pause_mora?: Mora | null;
+  is_interrogative?: boolean;
+};
+
+type AudioQuery = {
+  accent_phrases: AccentPhrase[];
+  speedScale: number;
+  pitchScale: number;
+  intonationScale: number;
+  volumeScale: number;
+  prePhonemeLength: number;
+  postPhonemeLength: number;
+  outputSamplingRate: number;
+  outputStereo: boolean;
+  kana?: string;
+};
+
 // ずんだもん（ノーマル）= 3
 // 他: あまあま=1, ツンツン=7, セクシー=5, ささやき=22
 const SPEAKER_ID = 3;
@@ -34,7 +64,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const query = await queryRes.json();
+    const query = (await queryRes.json()) as AudioQuery;
 
     // Step 2: synthesis でWAVバイナリを生成
     const audioRes = await fetch(
