@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
           ? `VOICEVOXの応答が${VOICEVOX_TIMEOUT_MS / 1000}秒でタイムアウトしたのだ`
           : isConnectionError
           ? "VOICEVOXに繋がらなかったのだ。Dockerが起動しているか確認してほしいのだ"
-          : "音声合成でエラーが発生したのだ",
+          : "音声合成でエラーが発生したのだ。もう一度試してほしいのだ",
       },
       { status: isTimeoutError ? 504 : 503 }
     );
