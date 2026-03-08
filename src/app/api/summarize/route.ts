@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { Ollama } from "ollama";
+import { isNonEmptyString } from "@/lib/validate";
 
 const ollama = new Ollama({
   host: process.env.OLLAMA_BASE_URL ?? "http://localhost:11434",
@@ -12,7 +13,7 @@ const OLLAMA_TIMEOUT_MS = 120_000;
 export async function POST(req: NextRequest) {
   const { title, text } = await req.json();
 
-  if (!text || typeof text !== "string") {
+  if (!isNonEmptyString(text)) {
     return NextResponse.json({ error: "テキストが必要なのだ" }, { status: 400 });
   }
 

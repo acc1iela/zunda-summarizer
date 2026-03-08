@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isNonEmptyString } from "@/lib/validate";
 
 const VOICEVOX_BASE = process.env.VOICEVOX_BASE_URL ?? "http://localhost:50021";
 
@@ -44,7 +45,7 @@ const VOICEVOX_TIMEOUT_MS = 30_000;
 export async function POST(req: NextRequest) {
   const { text } = await req.json();
 
-  if (!text || typeof text !== "string") {
+  if (!isNonEmptyString(text)) {
     return NextResponse.json({ error: "テキストが必要なのだ" }, { status: 400 });
   }
 

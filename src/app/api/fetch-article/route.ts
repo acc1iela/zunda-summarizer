@@ -4,6 +4,7 @@ import { Readability } from "@mozilla/readability";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
+import { isNonEmptyString } from "@/lib/validate";
 
 // 長すぎる記事はLLMのコンテキスト制限に引っかかるので上限を設ける
 const MAX_TEXT_LENGTH = 8000;
@@ -49,7 +50,7 @@ async function writeCacheEntry(
 export async function POST(req: NextRequest) {
   const { url } = await req.json();
 
-  if (!url || typeof url !== "string") {
+  if (!isNonEmptyString(url)) {
     return NextResponse.json({ error: "URLが必要なのだ" }, { status: 400 });
   }
 
