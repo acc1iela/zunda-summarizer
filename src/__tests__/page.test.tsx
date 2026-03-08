@@ -85,6 +85,23 @@ describe("Home", () => {
     });
   });
 
+  it("エラー発生時、エラー要素にフォーカスが移動する", async () => {
+    const user = userEvent.setup();
+    mockFetch.mockResolvedValueOnce({
+      ok: false,
+      json: async () => ({ error: "記事の取得に失敗したのだ。URLを確認してほしいのだ" }),
+    });
+
+    render(<Home />);
+    await user.type(screen.getByLabelText("記事のURL"), "https://example.com");
+    await user.click(screen.getByRole("button", { name: "要約するのだ" }));
+
+    await waitFor(() => {
+      expect(screen.getByRole("alert")).toBeInTheDocument();
+    });
+    expect(document.activeElement).toBe(screen.getByRole("alert"));
+  });
+
   it("すべて成功すると要約テキストと音声プレーヤーが表示される", async () => {
     const user = userEvent.setup();
     mockFetch

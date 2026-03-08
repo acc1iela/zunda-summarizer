@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type Step = "idle" | "fetching" | "summarizing" | "speaking" | "done" | "error";
 
@@ -23,6 +23,11 @@ export default function Home() {
   const [error, setError] = useState("");
   const prevAudioUrl = useRef<string | null>(null);
   const prevCaptionUrl = useRef<string | null>(null);
+  const errorRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (step === "error") errorRef.current?.focus();
+  }, [step]);
 
   const isLoading = step === "fetching" || step === "summarizing" || step === "speaking";
 
@@ -148,8 +153,10 @@ export default function Home() {
         {/* エラー表示 */}
         {step === "error" && (
           <div
+            ref={errorRef}
             role="alert"
-            className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 text-red-700 text-sm"
+            tabIndex={-1}
+            className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 text-red-700 text-sm outline-none"
           >
             {error}
           </div>
