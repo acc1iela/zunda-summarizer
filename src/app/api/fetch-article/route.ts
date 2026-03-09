@@ -14,6 +14,11 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 const CACHE_DIR = path.join(os.tmpdir(), "zunda-summarizer-cache");
 type CacheEntry = { title: string; text: string; expiresAt: number };
 
+// キャッシュディレクトリはモジュール初期化時に一度だけ作成する
+const cacheDirReady = fs.mkdir(CACHE_DIR, { recursive: true }).catch((err) => {
+  console.warn("[fetch-article] キャッシュディレクトリの作成に失敗:", err);
+});
+
 function urlToCacheKey(url: string): string {
   return Buffer.from(url).toString("base64url") + ".json";
 }
@@ -40,7 +45,7 @@ async function writeCacheEntry(
   const filePath = path.join(CACHE_DIR, urlToCacheKey(url));
   const entry: CacheEntry = { ...data, expiresAt: Date.now() + CACHE_TTL_MS };
   try {
-    await fs.mkdir(CACHE_DIR, { recursive: true });
+    await cacheDirReady;
     await fs.writeFile(filePath, JSON.stringify(entry), "utf-8");
   } catch (err) {
     console.warn("[fetch-article] キャッシュ書き込み失敗:", err);
