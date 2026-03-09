@@ -19,11 +19,22 @@ const cacheDirReady = fs.mkdir(CACHE_DIR, { recursive: true }).catch((err) => {
   console.warn("[fetch-article] キャッシュディレクトリの作成に失敗:", err);
 });
 
+// L1: プロセス内メモリキャッシュ（ファイルI/Oを省略するための高速レイヤー）
+const memoryCache = new Map<string, CacheEntry>();
+
 function urlToCacheKey(url: string): string {
   return Buffer.from(url).toString("base64url") + ".json";
 }
 
 async function readCacheEntry(url: string): Promise<CacheEntry | null> {
+  // L1: メモリキャッシュを先に確認（ファイルI/O不要）
+  const memEntry = memoryCache.get(url);
+  if (memEntry) {
+    if (Date.now() <= memEntry.expiresAt) return memEntry;
+    memoryCache.delete(url); // 期限切れは遅延削除
+  }
+
+  // L2: ファイルキャッシュ
   const filePath = path.join(CACHE_DIR, urlToCacheKey(url));
   try {
     const content = await fs.readFile(filePath, "utf-8");
@@ -32,6 +43,7 @@ async function readCacheEntry(url: string): Promise<CacheEntry | null> {
       await fs.unlink(filePath).catch(() => {}); // 期限切れは削除
       return null;
     }
+    memoryCache.set(url, entry); // L1 に昇格して次回以降の I/O を省略
     return entry;
   } catch {
     return null; // ファイルが存在しない or パースエラー
@@ -42,8 +54,10 @@ async function writeCacheEntry(
   url: string,
   data: { title: string; text: string }
 ): Promise<void> {
-  const filePath = path.join(CACHE_DIR, urlToCacheKey(url));
   const entry: CacheEntry = { ...data, expiresAt: Date.now() + CACHE_TTL_MS };
+  memoryCache.set(url, entry); // L1 にも即時保存
+
+  const filePath = path.join(CACHE_DIR, urlToCacheKey(url));
   try {
     await cacheDirReady;
     await fs.writeFile(filePath, JSON.stringify(entry), "utf-8");
