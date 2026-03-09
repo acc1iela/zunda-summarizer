@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type Step = "idle" | "fetching" | "summarizing" | "speaking" | "done" | "error";
 
@@ -30,6 +30,10 @@ export default function Home() {
   }, [step]);
 
   const isLoading = step === "fetching" || step === "summarizing" || step === "speaking";
+  const downloadHref = useMemo(
+    () => `data:text/plain;charset=utf-8,${encodeURIComponent(summary)}`,
+    [summary]
+  );
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -175,7 +179,7 @@ export default function Home() {
             </p>
             <div className="mt-4 pt-3 border-t border-emerald-100 flex justify-end">
               <a
-                href={`data:text/plain;charset=utf-8,${encodeURIComponent(summary)}`}
+                href={downloadHref}
                 download="summary.txt"
                 className="text-xs text-emerald-600 hover:text-emerald-800 underline transition-colors"
               >
