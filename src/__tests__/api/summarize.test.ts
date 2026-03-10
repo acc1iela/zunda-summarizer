@@ -1,6 +1,14 @@
 import { POST } from "@/app/api/summarize/route";
 import { NextRequest } from "next/server";
 
+// テストでは常にキャッシュミスになるよう fs/promises をモック
+jest.mock("fs/promises", () => ({
+  readFile: jest.fn().mockRejectedValue(Object.assign(new Error("ENOENT"), { code: "ENOENT" })),
+  writeFile: jest.fn().mockResolvedValue(undefined),
+  mkdir: jest.fn().mockResolvedValue(undefined),
+  unlink: jest.fn().mockResolvedValue(undefined),
+}));
+
 // @swc/jest は mock プレフィックス変数のホイストを行わないため、
 // クロージャで包んで mockChat を遅延参照する
 const mockChat = jest.fn();

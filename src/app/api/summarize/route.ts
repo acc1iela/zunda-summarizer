@@ -1,3 +1,7 @@
+import crypto from "crypto";
+import fs from "fs/promises";
+import path from "path";
+import os from "os";
 import { NextRequest, NextResponse } from "next/server";
 import { Ollama } from "ollama";
 import { isNonEmptyString } from "@/lib/validate";
@@ -10,11 +14,68 @@ const MODEL = process.env.OLLAMA_MODEL ?? "gemma3:4b";
 
 const OLLAMA_TIMEOUT_MS = 120_000;
 
+// --- 要約キャッシュ（L1: メモリ / L2: ファイル、TTL 1時間） ---
+const SUMMARY_CACHE_TTL_MS = 60 * 60 * 1000;
+const SUMMARY_CACHE_DIR = path.join(os.tmpdir(), "zunda-summarizer-summary-cache");
+type SummaryCacheEntry = { summary: string; expiresAt: number };
+
+const summaryCacheDirReady = fs.mkdir(SUMMARY_CACHE_DIR, { recursive: true }).catch((err) => {
+  console.warn("[summarize] キャッシュディレクトリの作成に失敗:", err);
+});
+
+const summaryMemoryCache = new Map<string, SummaryCacheEntry>();
+
+function toSummaryCacheKey(title: string, text: string): string {
+  return (
+    crypto.createHash("sha256").update(`${title}\0${text}`).digest("base64url") + ".json"
+  );
+}
+
+async function readSummaryCacheEntry(key: string): Promise<string | null> {
+  const mem = summaryMemoryCache.get(key);
+  if (mem) {
+    if (Date.now() <= mem.expiresAt) return mem.summary;
+    summaryMemoryCache.delete(key);
+  }
+  const filePath = path.join(SUMMARY_CACHE_DIR, key);
+  try {
+    const content = await fs.readFile(filePath, "utf-8");
+    const entry: SummaryCacheEntry = JSON.parse(content);
+    if (Date.now() > entry.expiresAt) {
+      await fs.unlink(filePath).catch(() => {});
+      return null;
+    }
+    summaryMemoryCache.set(key, entry);
+    return entry.summary;
+  } catch {
+    return null;
+  }
+}
+
+async function writeSummaryCacheEntry(key: string, summary: string): Promise<void> {
+  const entry: SummaryCacheEntry = { summary, expiresAt: Date.now() + SUMMARY_CACHE_TTL_MS };
+  summaryMemoryCache.set(key, entry);
+  const filePath = path.join(SUMMARY_CACHE_DIR, key);
+  try {
+    await summaryCacheDirReady;
+    await fs.writeFile(filePath, JSON.stringify(entry), "utf-8");
+  } catch (err) {
+    console.warn("[summarize] キャッシュ書き込み失敗:", err);
+  }
+}
+// --- End Cache ---
+
 export async function POST(req: NextRequest) {
   const { title, text } = await req.json();
 
   if (!isNonEmptyString(text)) {
     return NextResponse.json({ error: "テキストが必要なのだ" }, { status: 400 });
+  }
+
+  const cacheKey = toSummaryCacheKey(title ?? "", text);
+  const cached = await readSummaryCacheEntry(cacheKey);
+  if (cached) {
+    return NextResponse.json({ summary: cached });
   }
 
   const prompt = `あなたはずんだもんです。語尾は「〜なのだ」「〜のだ」を使います。
@@ -52,6 +113,8 @@ ${text}
         { status: 502 }
       );
     }
+
+    await writeSummaryCacheEntry(cacheKey, content);
 
     return NextResponse.json({ summary: content });
   } catch (err) {
