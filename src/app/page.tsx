@@ -67,12 +67,57 @@ export default function Home() {
 
         {/* 処理ステータス */}
         {isLoading && (
-          <div
-            role="status"
-            aria-live="polite"
-            className="text-center text-emerald-600 mb-6 animate-pulse font-medium"
-          >
-            {STEP_LABELS[step]}
+          <div role="status" aria-live="polite" className="mb-6">
+            <ol className="flex items-center justify-center gap-1">
+              {(
+                [
+                  { key: "fetching", label: "記事取得" },
+                  { key: "summarizing", label: "要約生成" },
+                  { key: "speaking", label: "音声合成" },
+                ] as const
+              ).map(({ key, label }, i) => {
+                const STEP_ORDER = ["fetching", "summarizing", "speaking"] as const;
+                const currentIndex = STEP_ORDER.indexOf(step as (typeof STEP_ORDER)[number]);
+                const isDone = currentIndex > i;
+                const isActive = currentIndex === i;
+                return (
+                  <li key={key} className="flex items-center gap-1">
+                    <div
+                      className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${
+                        isDone
+                          ? "bg-emerald-500 text-white"
+                          : isActive
+                          ? "bg-emerald-400 text-white animate-pulse"
+                          : "bg-gray-200 text-gray-400"
+                      }`}
+                    >
+                      {isDone ? "✓" : i + 1}
+                    </div>
+                    <span
+                      className={`text-sm transition-colors ${
+                        isActive
+                          ? "text-emerald-600 font-medium"
+                          : isDone
+                          ? "text-emerald-500"
+                          : "text-gray-400"
+                      }`}
+                    >
+                      {label}
+                    </span>
+                    {i < 2 && (
+                      <div
+                        className={`w-6 h-0.5 mx-1 transition-colors ${
+                          isDone ? "bg-emerald-400" : "bg-gray-200"
+                        }`}
+                      />
+                    )}
+                  </li>
+                );
+              })}
+            </ol>
+            <p className="text-center text-emerald-600 mt-2 text-sm font-medium">
+              {STEP_LABELS[step]}
+            </p>
           </div>
         )}
 
