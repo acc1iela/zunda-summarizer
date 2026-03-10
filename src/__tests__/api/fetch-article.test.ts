@@ -48,6 +48,13 @@ describe("POST /api/fetch-article", () => {
     expect(res.status).toBe(400);
   });
 
+  it("http/https 以外のURLスキームは 400 を返す", async () => {
+    const res = await POST(makeRequest({ url: "file:///etc/passwd" }));
+    expect(res.status).toBe(400);
+    const data = await res.json();
+    expect(data.error).toContain("http");
+  });
+
   it("fetch が失敗したら 400 を返す", async () => {
     global.fetch = jest.fn().mockRejectedValueOnce(new TypeError("fetch failed"));
     const res = await POST(makeRequest({ url: "https://example.com/err" }));

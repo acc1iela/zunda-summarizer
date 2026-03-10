@@ -73,6 +73,19 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "URLが必要なのだ" }, { status: 400 });
   }
 
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(url);
+  } catch {
+    return NextResponse.json({ error: "URLの形式が正しくないのだ" }, { status: 400 });
+  }
+  if (!["http:", "https:"].includes(parsedUrl.protocol)) {
+    return NextResponse.json(
+      { error: "http または https のURLのみ対応しているのだ" },
+      { status: 400 }
+    );
+  }
+
   const cached = await readCacheEntry(url);
   if (cached) {
     return NextResponse.json({ title: cached.title, text: cached.text });
