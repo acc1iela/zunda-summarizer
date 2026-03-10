@@ -19,6 +19,12 @@ jest.mock("ollama", () => ({
   })),
 }));
 
+async function* makeTokenStream(...tokens: string[]) {
+  for (const t of tokens) {
+    yield { message: { content: t } };
+  }
+}
+
 function makeRequest(body: unknown): NextRequest {
   return new NextRequest("http://localhost/api/summarize", {
     method: "POST",
@@ -29,7 +35,7 @@ function makeRequest(body: unknown): NextRequest {
 describe("POST /api/summarize", () => {
   beforeEach(() => {
     mockChat.mockReset();
-    mockChat.mockResolvedValue({ message: { content: "要約なのだ" } });
+    mockChat.mockResolvedValue(makeTokenStream("要約なのだ"));
   });
 
   it("text が未指定なら 400 を返す", async () => {
@@ -42,11 +48,13 @@ describe("POST /api/summarize", () => {
     expect(res.status).toBe(400);
   });
 
-  it("正常な場合は summary を返す", async () => {
+  it("正常な場合はストリームで summary を返す", async () => {
+    mockChat.mockResolvedValueOnce(makeTokenStream("要約", "なのだ"));
     const res = await POST(makeRequest({ title: "テスト", text: "記事本文" }));
     expect(res.status).toBe(200);
-    const data = await res.json();
-    expect(data.summary).toBe("要約なのだ");
+    expect(res.headers.get("Content-Type")).toContain("text/plain");
+    const text = await res.text();
+    expect(text).toBe("要約なのだ");
   });
 
   it("Ollama 接続失敗時は 503 を返す", async () => {
@@ -55,9 +63,11 @@ describe("POST /api/summarize", () => {
     expect(res.status).toBe(503);
   });
 
-  it("Ollama のレスポンスが不正なら 502 を返す", async () => {
-    mockChat.mockResolvedValueOnce({ message: { content: null } });
+  it("Ollama タイムアウト時は 504 を返す", async () => {
+    const err = new Error("Timeout");
+    err.name = "TimeoutError";
+    mockChat.mockRejectedValueOnce(err);
     const res = await POST(makeRequest({ text: "記事本文" }));
-    expect(res.status).toBe(502);
+    expect(res.status).toBe(504);
   });
 });

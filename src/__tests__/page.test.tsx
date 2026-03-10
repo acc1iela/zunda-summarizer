@@ -9,6 +9,27 @@ import Home from "@/app/page";
 global.URL.createObjectURL = jest.fn(() => "blob:mock-audio");
 global.URL.revokeObjectURL = jest.fn();
 
+/** テキストを1チャンクで返すストリームレスポンスを生成するヘルパー */
+function makeStreamResponse(text: string): Partial<Response> {
+  // Buffer は Uint8Array のサブクラスなので TextDecoder.decode() で復元できる
+  const value = Buffer.from(text, "utf-8");
+  let done = false;
+  return {
+    ok: true,
+    body: {
+      getReader: () => ({
+        read: jest.fn().mockImplementation(() => {
+          if (!done) {
+            done = true;
+            return Promise.resolve({ done: false, value });
+          }
+          return Promise.resolve({ done: true, value: undefined });
+        }),
+      }),
+    } as unknown as ReadableStream,
+  };
+}
+
 const mockFetch = jest.fn();
 
 beforeAll(() => {
@@ -74,6 +95,7 @@ describe("Home", () => {
       .mockResolvedValueOnce({
         ok: false,
         json: async () => ({ error: "Ollamaに接続できなかったのだ。ollama serve を確認してほしいのだ" }),
+        body: null,
       });
 
     render(<Home />);
@@ -109,10 +131,7 @@ describe("Home", () => {
         ok: true,
         json: async () => ({ title: "テスト記事タイトル", text: "テスト本文" }),
       })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ summary: "これはテストの要約なのだ" }),
-      })
+      .mockResolvedValueOnce(makeStreamResponse("これはテストの要約なのだ"))
       .mockResolvedValueOnce({
         ok: true,
         blob: async () => new Blob(["audio"], { type: "audio/wav" }),

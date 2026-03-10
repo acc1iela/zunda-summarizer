@@ -75,7 +75,10 @@ export async function POST(req: NextRequest) {
   const cacheKey = toSummaryCacheKey(title ?? "", text);
   const cached = await readSummaryCacheEntry(cacheKey);
   if (cached) {
-    return NextResponse.json({ summary: cached });
+    // キャッシュヒット: テキストストリームとして返す（クライアント側の読み方を統一するため）
+    return new NextResponse(cached, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
   }
 
   const prompt = `あなたはずんだもんです。語尾は「〜なのだ」「〜のだ」を使います。
@@ -88,35 +91,25 @@ ${text}
 
 要約（ずんだもんの口調で）:`;
 
+  // 接続タイムアウト: Ollama が起動していない場合に備え Promise.race で制限
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => {
+      const err = new Error(`Timeout after ${OLLAMA_TIMEOUT_MS}ms`);
+      err.name = "TimeoutError";
+      reject(err);
+    }, OLLAMA_TIMEOUT_MS)
+  );
+
+  let ollamaStream: AsyncIterable<{ message?: { content?: string } }>;
   try {
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => {
-        const err = new Error(`Timeout after ${OLLAMA_TIMEOUT_MS}ms`);
-        err.name = "TimeoutError";
-        reject(err);
-      }, OLLAMA_TIMEOUT_MS)
-    );
-    const response = await Promise.race([
+    ollamaStream = await Promise.race([
       ollama.chat({
         model: MODEL,
         messages: [{ role: "user", content: prompt }],
-        stream: false,
-      }),
+        stream: true,
+      }) as Promise<AsyncIterable<{ message?: { content?: string } }>>,
       timeoutPromise,
     ]);
-
-    const content = response.message?.content;
-    if (typeof content !== "string") {
-      console.error("[summarize] Unexpected response shape:", response);
-      return NextResponse.json(
-        { error: "モデルの応答が不正なのだ" },
-        { status: 502 }
-      );
-    }
-
-    await writeSummaryCacheEntry(cacheKey, content);
-
-    return NextResponse.json({ summary: content });
   } catch (err) {
     console.error("[summarize]", err);
     const isTimeoutError = err instanceof Error && err.name === "TimeoutError";
@@ -132,4 +125,32 @@ ${text}
       { status: isTimeoutError ? 504 : 503 }
     );
   }
+
+  // Ollama のトークンをそのままクライアントへストリーミング
+  let fullContent = "";
+  const encoder = new TextEncoder();
+  const readable = new ReadableStream({
+    async start(controller) {
+      try {
+        for await (const chunk of ollamaStream) {
+          const token = chunk.message?.content ?? "";
+          if (token) {
+            fullContent += token;
+            controller.enqueue(encoder.encode(token));
+          }
+        }
+        if (fullContent) {
+          await writeSummaryCacheEntry(cacheKey, fullContent);
+        }
+      } catch (err) {
+        console.error("[summarize] Stream error:", err);
+      } finally {
+        controller.close();
+      }
+    },
+  });
+
+  return new NextResponse(readable, {
+    headers: { "Content-Type": "text/plain; charset=utf-8" },
+  });
 }

@@ -76,7 +76,7 @@ export function useSummarizer(url: string) {
       if (!fetchRes.ok) throw new Error(fetchData.error);
       setTitle(fetchData.title);
 
-      // Step 2: 要約
+      // Step 2: 要約（ストリーミング）
       setStep("summarizing");
       const sumRes = await fetch("/api/summarize", {
         method: "POST",
@@ -84,16 +84,28 @@ export function useSummarizer(url: string) {
         body: JSON.stringify({ title: fetchData.title, text: fetchData.text }),
         signal,
       });
-      const sumData = await sumRes.json();
-      if (!sumRes.ok) throw new Error(sumData.error);
-      setSummary(sumData.summary);
+      if (!sumRes.ok) {
+        const sumData = await sumRes.json();
+        throw new Error(sumData.error);
+      }
+      // トークンを逐次受信して要約テキストをリアルタイム更新
+      const reader = sumRes.body!.getReader();
+      const decoder = new TextDecoder();
+      let summaryText = "";
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        summaryText += decoder.decode(value, { stream: true });
+        setSummary(summaryText);
+      }
+      if (!summaryText) throw new Error("要約の取得に失敗したのだ");
 
       // Step 3: 音声生成
       setStep("speaking");
       const speakRes = await fetch("/api/speak", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: sumData.summary }),
+        body: JSON.stringify({ text: summaryText }),
         signal,
       });
       if (!speakRes.ok) {
@@ -105,7 +117,7 @@ export function useSummarizer(url: string) {
       prevAudioUrl.current = objectUrl;
 
       // 音声の字幕として要約テキストを WebVTT に変換
-      const vtt = `WEBVTT\n\n00:00:00.000 --> 99:59:59.999\n${sumData.summary}`;
+      const vtt = `WEBVTT\n\n00:00:00.000 --> 99:59:59.999\n${summaryText}`;
       const captionBlob = new Blob([vtt], { type: "text/vtt" });
       const captionObjectUrl = URL.createObjectURL(captionBlob);
       prevCaptionUrl.current = captionObjectUrl;
