@@ -23,6 +23,11 @@ export function useSummarizer(url: string) {
   const prevAudioUrl = useRef<string | null>(null);
   const prevCaptionUrl = useRef<string | null>(null);
   const errorRef = useRef<HTMLDivElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  function handleCancel() {
+    abortRef.current?.abort();
+  }
 
   useEffect(() => {
     if (step === "error") errorRef.current?.focus();
@@ -36,6 +41,12 @@ export function useSummarizer(url: string) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    // 前のリクエストをキャンセル（連打対策）
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+    const { signal } = controller;
+
     setError("");
     setSummary("");
     setTitle("");
@@ -59,6 +70,7 @@ export function useSummarizer(url: string) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ url }),
+        signal,
       });
       const fetchData = await fetchRes.json();
       if (!fetchRes.ok) throw new Error(fetchData.error);
@@ -70,6 +82,7 @@ export function useSummarizer(url: string) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ title: fetchData.title, text: fetchData.text }),
+        signal,
       });
       const sumData = await sumRes.json();
       if (!sumRes.ok) throw new Error(sumData.error);
@@ -81,6 +94,7 @@ export function useSummarizer(url: string) {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: sumData.summary }),
+        signal,
       });
       if (!speakRes.ok) {
         const speakData = await speakRes.json();
@@ -100,6 +114,10 @@ export function useSummarizer(url: string) {
       setCaptionUrl(captionObjectUrl);
       setStep("done");
     } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") {
+        setStep("idle");
+        return;
+      }
       console.error("[handleSubmit]", err);
       setError(err instanceof Error ? err.message : "予期しないエラーが発生したのだ");
       setStep("error");
@@ -117,5 +135,6 @@ export function useSummarizer(url: string) {
     downloadHref,
     errorRef,
     handleSubmit,
+    handleCancel,
   };
 }

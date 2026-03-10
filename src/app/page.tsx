@@ -17,6 +17,7 @@ export default function Home() {
     downloadHref,
     errorRef,
     handleSubmit,
+    handleCancel,
   } = useSummarizer(url);
 
   return (
@@ -52,6 +53,15 @@ export default function Home() {
             >
               {isLoading ? "処理中..." : "要約するのだ"}
             </button>
+            {isLoading && (
+              <button
+                type="button"
+                onClick={handleCancel}
+                className="px-4 py-3 bg-white hover:bg-gray-50 active:bg-gray-100 border-2 border-gray-300 text-gray-600 font-semibold rounded-xl transition-colors whitespace-nowrap"
+              >
+                キャンセル
+              </button>
+            )}
           </div>
         </form>
 
