@@ -16,6 +16,7 @@ const STEP_LABELS: Record<Step, string> = {
 export default function Home() {
   const [url, setUrl] = useState("");
   const [step, setStep] = useState<Step>("idle");
+  const [copied, setCopied] = useState(false);
   const [title, setTitle] = useState("");
   const [summary, setSummary] = useState("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
@@ -177,7 +178,18 @@ export default function Home() {
             <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
               {summary}
             </p>
-            <div className="mt-4 pt-3 border-t border-emerald-100 flex justify-end">
+            <div className="mt-4 pt-3 border-t border-emerald-100 flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(summary);
+                  setCopied(true);
+                  setTimeout(() => setCopied(false), 2000);
+                }}
+                className="text-xs text-emerald-600 hover:text-emerald-800 transition-colors"
+              >
+                {copied ? "コピー済み！" : "コピー"}
+              </button>
               <a
                 href={downloadHref}
                 download="summary.txt"
