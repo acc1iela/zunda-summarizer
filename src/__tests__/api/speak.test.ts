@@ -33,6 +33,16 @@ describe("POST /api/speak", () => {
     expect(data.error).toContain("繋がらなかった");
   });
 
+  it("VOICEVOX タイムアウト時は 504 を返す", async () => {
+    const err = new Error("The operation was aborted");
+    err.name = "TimeoutError";
+    global.fetch = jest.fn().mockRejectedValueOnce(err);
+    const res = await POST(makeRequest({ text: "テストなのだ" }));
+    expect(res.status).toBe(504);
+    const data = await res.json();
+    expect(data.error).toContain("タイムアウト");
+  });
+
   it("audio_query が失敗したら 502 を返す", async () => {
     global.fetch = jest
       .fn()
