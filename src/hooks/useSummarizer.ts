@@ -39,8 +39,7 @@ export function useSummarizer(url: string) {
     [summary]
   );
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function run() {
     // 前のリクエストをキャンセル（連打対策）
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -136,6 +135,15 @@ export function useSummarizer(url: string) {
     }
   }
 
+  function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    run();
+  }
+
+  function handleRerun() {
+    run();
+  }
+
   return {
     step,
     title,
@@ -148,5 +156,6 @@ export function useSummarizer(url: string) {
     errorRef,
     handleSubmit,
     handleCancel,
+    handleRerun,
   };
 }

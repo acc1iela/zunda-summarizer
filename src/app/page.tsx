@@ -18,6 +18,7 @@ export default function Home() {
     errorRef,
     handleSubmit,
     handleCancel,
+    handleRerun,
   } = useSummarizer(url);
 
   return (
@@ -129,7 +130,16 @@ export default function Home() {
             tabIndex={-1}
             className="bg-red-50 border border-red-200 rounded-xl p-4 mb-6 text-red-700 text-sm outline-none"
           >
-            {error}
+            <p>{error}</p>
+            {url && (
+              <button
+                type="button"
+                onClick={handleRerun}
+                className="mt-2 text-xs text-red-500 hover:text-red-700 underline transition-colors"
+              >
+                再試行するのだ
+              </button>
+            )}
           </div>
         )}
 
@@ -144,25 +154,35 @@ export default function Home() {
             <p className="text-gray-800 leading-relaxed whitespace-pre-wrap">
               {summary}
             </p>
-            <div className="mt-4 pt-3 border-t border-emerald-100 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => {
-                  navigator.clipboard.writeText(summary);
-                  setCopied(true);
-                  setTimeout(() => setCopied(false), 2000);
-                }}
-                className="text-xs text-emerald-600 hover:text-emerald-800 transition-colors"
-              >
-                {copied ? "コピー済み！" : "コピー"}
-              </button>
-              <a
-                href={downloadHref}
-                download="summary.txt"
-                className="text-xs text-emerald-600 hover:text-emerald-800 underline transition-colors"
-              >
-                テキストをダウンロード
-              </a>
+            <div className="mt-4 pt-3 border-t border-emerald-100 flex items-center justify-between gap-3">
+              <span className="text-xs text-gray-400">{summary.length} 文字</span>
+              <div className="flex gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(summary);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 2000);
+                  }}
+                  className="text-xs text-emerald-600 hover:text-emerald-800 transition-colors"
+                >
+                  {copied ? "コピー済み！" : "コピー"}
+                </button>
+                <a
+                  href={downloadHref}
+                  download="summary.txt"
+                  className="text-xs text-emerald-600 hover:text-emerald-800 underline transition-colors"
+                >
+                  テキストをダウンロード
+                </a>
+                <button
+                  type="button"
+                  onClick={handleRerun}
+                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  再生成
+                </button>
+              </div>
             </div>
           </div>
         )}
