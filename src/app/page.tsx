@@ -1,7 +1,76 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useState } from "react";
 import { useSummarizer, STEP_LABELS } from "@/hooks/useSummarizer";
+
+type InputFormProps = {
+  url: string;
+  isLoading: boolean;
+  onUrlChange: (v: string) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onCancel: () => void;
+};
+
+const InputForm = memo(function InputForm({
+  url,
+  isLoading,
+  onUrlChange,
+  onSubmit,
+  onCancel,
+}: InputFormProps) {
+  return (
+    <form onSubmit={onSubmit} className="mb-6">
+      <div className="flex gap-2">
+        <input
+          type="url"
+          value={url}
+          onChange={(e) => onUrlChange(e.target.value)}
+          placeholder="https://example.com/article"
+          required
+          disabled={isLoading}
+          aria-label="記事のURL"
+          className="flex-1 px-4 py-3 rounded-xl border-2 border-emerald-200 dark:border-emerald-700 focus:border-emerald-400 dark:focus:border-emerald-500 focus:outline-none bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 disabled:opacity-50 transition-colors"
+        />
+        <button
+          type="submit"
+          disabled={isLoading || !url}
+          className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:bg-emerald-300 dark:disabled:bg-emerald-800 text-white font-semibold rounded-xl transition-colors whitespace-nowrap"
+        >
+          {isLoading ? "処理中..." : "要約するのだ"}
+        </button>
+        {isLoading && (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-3 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 active:bg-gray-100 dark:active:bg-gray-500 border-2 border-gray-300 dark:border-gray-500 text-gray-600 dark:text-gray-300 font-semibold rounded-xl transition-colors whitespace-nowrap"
+          >
+            キャンセル
+          </button>
+        )}
+      </div>
+    </form>
+  );
+});
+
+type AudioPlayerProps = {
+  audioUrl: string;
+  captionUrl: string | null;
+};
+
+const AudioPlayer = memo(function AudioPlayer({ audioUrl, captionUrl }: AudioPlayerProps) {
+  return (
+    <div className="bg-emerald-50 dark:bg-gray-800 rounded-2xl border-2 border-emerald-200 dark:border-emerald-700 p-4 mb-6">
+      <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-2 font-medium">
+        ずんだもんの音声
+      </p>
+      <audio controls autoPlay src={audioUrl} className="w-full">
+        {captionUrl && (
+          <track kind="captions" src={captionUrl} srcLang="ja" label="日本語" default />
+        )}
+      </audio>
+    </div>
+  );
+});
 
 export default function Home() {
   const [url, setUrl] = useState("");
@@ -35,36 +104,13 @@ export default function Home() {
         </div>
 
         {/* URL入力フォーム */}
-        <form onSubmit={handleSubmit} className="mb-6">
-          <div className="flex gap-2">
-            <input
-              type="url"
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              placeholder="https://example.com/article"
-              required
-              disabled={isLoading}
-              aria-label="記事のURL"
-              className="flex-1 px-4 py-3 rounded-xl border-2 border-emerald-200 dark:border-emerald-700 focus:border-emerald-400 dark:focus:border-emerald-500 focus:outline-none bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 disabled:opacity-50 transition-colors"
-            />
-            <button
-              type="submit"
-              disabled={isLoading || !url}
-              className="px-6 py-3 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:bg-emerald-300 dark:disabled:bg-emerald-800 text-white font-semibold rounded-xl transition-colors whitespace-nowrap"
-            >
-              {isLoading ? "処理中..." : "要約するのだ"}
-            </button>
-            {isLoading && (
-              <button
-                type="button"
-                onClick={handleCancel}
-                className="px-4 py-3 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600 active:bg-gray-100 dark:active:bg-gray-500 border-2 border-gray-300 dark:border-gray-500 text-gray-600 dark:text-gray-300 font-semibold rounded-xl transition-colors whitespace-nowrap"
-              >
-                キャンセル
-              </button>
-            )}
-          </div>
-        </form>
+        <InputForm
+          url={url}
+          isLoading={isLoading}
+          onUrlChange={setUrl}
+          onSubmit={handleSubmit}
+          onCancel={handleCancel}
+        />
 
         {/* 処理ステータス */}
         {isLoading && (
@@ -188,18 +234,7 @@ export default function Home() {
         )}
 
         {/* 音声プレーヤー */}
-        {audioUrl && (
-          <div className="bg-emerald-50 dark:bg-gray-800 rounded-2xl border-2 border-emerald-200 dark:border-emerald-700 p-4 mb-6">
-            <p className="text-xs text-emerald-600 dark:text-emerald-400 mb-2 font-medium">
-              ずんだもんの音声
-            </p>
-            <audio controls autoPlay src={audioUrl} className="w-full">
-              {captionUrl && (
-                <track kind="captions" src={captionUrl} srcLang="ja" label="日本語" default />
-              )}
-            </audio>
-          </div>
-        )}
+        {audioUrl && <AudioPlayer audioUrl={audioUrl} captionUrl={captionUrl} />}
 
         {/* クレジット（ライセンス表記必須） */}
         <footer className="text-center text-xs text-gray-400 mt-10 space-y-1">

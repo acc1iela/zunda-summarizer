@@ -1,7 +1,61 @@
+import crypto from "crypto";
+import fs from "fs/promises";
+import path from "path";
+import os from "os";
 import { NextRequest, NextResponse } from "next/server";
 import { isNonEmptyString } from "@/lib/validate";
 
 const VOICEVOX_BASE = process.env.VOICEVOX_BASE_URL ?? "http://localhost:50021";
+
+// --- 音声キャッシュ（L1: メモリ / L2: バイナリファイル、TTL 24時間） ---
+// 同じテキストの音声合成は結果が一定なので長めのTTLを設定する
+const SPEAK_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const SPEAK_CACHE_DIR = path.join(os.tmpdir(), "zunda-summarizer-speak-cache");
+type SpeakCacheEntry = { buffer: Buffer; expiresAt: number };
+
+const speakCacheDirReady = fs.mkdir(SPEAK_CACHE_DIR, { recursive: true }).catch((err) => {
+  console.warn("[speak] キャッシュディレクトリの作成に失敗:", err);
+});
+
+const speakMemoryCache = new Map<string, SpeakCacheEntry>();
+
+function toSpeakCacheKey(text: string): string {
+  return crypto.createHash("sha256").update(text).digest("hex");
+}
+
+async function readSpeakCache(key: string): Promise<Buffer | null> {
+  const mem = speakMemoryCache.get(key);
+  if (mem) {
+    if (Date.now() <= mem.expiresAt) return mem.buffer;
+    speakMemoryCache.delete(key);
+  }
+  const filePath = path.join(SPEAK_CACHE_DIR, key + ".wav");
+  try {
+    const stat = await fs.stat(filePath);
+    const expiresAt = stat.mtimeMs + SPEAK_CACHE_TTL_MS;
+    if (Date.now() > expiresAt) {
+      await fs.unlink(filePath).catch(() => {});
+      return null;
+    }
+    const buffer = await fs.readFile(filePath);
+    speakMemoryCache.set(key, { buffer, expiresAt });
+    return buffer;
+  } catch {
+    return null;
+  }
+}
+
+async function writeSpeakCache(key: string, buffer: Buffer): Promise<void> {
+  speakMemoryCache.set(key, { buffer, expiresAt: Date.now() + SPEAK_CACHE_TTL_MS });
+  const filePath = path.join(SPEAK_CACHE_DIR, key + ".wav");
+  try {
+    await speakCacheDirReady;
+    await fs.writeFile(filePath, buffer);
+  } catch (err) {
+    console.warn("[speak] キャッシュ書き込み失敗:", err);
+  }
+}
+// --- End Cache ---
 
 // VOICEVOX /audio_query レスポンスの型定義
 type Mora = {
@@ -51,6 +105,17 @@ export async function POST(req: NextRequest) {
 
   const speakText = text.slice(0, MAX_SPEAK_LENGTH);
 
+  const cacheKey = toSpeakCacheKey(speakText);
+  const cached = await readSpeakCache(cacheKey);
+  if (cached) {
+    return new NextResponse(cached.buffer as ArrayBuffer, {
+      headers: {
+        "Content-Type": "audio/wav",
+        "Content-Length": cached.byteLength.toString(),
+      },
+    });
+  }
+
   try {
     // Step 1: audio_query でテキスト→音声パラメータJSONを生成
     const queryRes = await fetch(
@@ -86,6 +151,10 @@ export async function POST(req: NextRequest) {
     }
 
     const audioBuffer = await audioRes.arrayBuffer();
+    const audioBytes = Buffer.from(audioBuffer);
+
+    // バックグラウンドでキャッシュに保存（レスポンスをブロックしない）
+    writeSpeakCache(cacheKey, audioBytes).catch(() => {});
 
     return new NextResponse(audioBuffer, {
       headers: {

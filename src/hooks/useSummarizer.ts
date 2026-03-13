@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export type Step = "idle" | "fetching" | "summarizing" | "speaking" | "done" | "error";
 
@@ -25,9 +25,9 @@ export function useSummarizer(url: string) {
   const errorRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
 
-  function handleCancel() {
+  const handleCancel = useCallback(() => {
     abortRef.current?.abort();
-  }
+  }, []);
 
   useEffect(() => {
     if (step === "error") errorRef.current?.focus();
@@ -39,7 +39,7 @@ export function useSummarizer(url: string) {
     [summary]
   );
 
-  async function run() {
+  const run = useCallback(async () => {
     // 前のリクエストをキャンセル（連打対策）
     abortRef.current?.abort();
     const controller = new AbortController();
@@ -87,17 +87,24 @@ export function useSummarizer(url: string) {
         const sumData = await sumRes.json();
         throw new Error(sumData.error);
       }
-      // トークンを逐次受信して要約テキストをリアルタイム更新
+      // トークンを逐次受信して要約テキストをリアルタイム更新（50ms throttle で再レンダを抑制）
       const reader = sumRes.body!.getReader();
       const decoder = new TextDecoder();
       let summaryText = "";
+      let lastRender = 0;
+      const RENDER_INTERVAL_MS = 50;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         summaryText += decoder.decode(value, { stream: true });
-        setSummary(summaryText);
+        const now = Date.now();
+        if (now - lastRender >= RENDER_INTERVAL_MS) {
+          setSummary(summaryText);
+          lastRender = now;
+        }
       }
       if (!summaryText) throw new Error("要約の取得に失敗したのだ");
+      setSummary(summaryText); // ストリーム終了後に最終反映
 
       // Step 3: 音声生成
       setStep("speaking");
@@ -133,16 +140,19 @@ export function useSummarizer(url: string) {
       setError(err instanceof Error ? err.message : "予期しないエラーが発生したのだ");
       setStep("error");
     }
-  }
+  }, [url]);
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    run();
-  }
+  const handleSubmit = useCallback(
+    (e: React.FormEvent) => {
+      e.preventDefault();
+      run();
+    },
+    [run]
+  );
 
-  function handleRerun() {
+  const handleRerun = useCallback(() => {
     run();
-  }
+  }, [run]);
 
   return {
     step,
