@@ -33,6 +33,14 @@ export function useSummarizer(url: string) {
     if (step === "error") errorRef.current?.focus();
   }, [step]);
 
+  // アンマウント時に残存する Blob URL を解放してメモリリークを防ぐ
+  useEffect(() => {
+    return () => {
+      if (prevAudioUrl.current) URL.revokeObjectURL(prevAudioUrl.current);
+      if (prevCaptionUrl.current) URL.revokeObjectURL(prevCaptionUrl.current);
+    };
+  }, []);
+
   const isLoading = step === "fetching" || step === "summarizing" || step === "speaking";
   const downloadHref = useMemo(
     () => `data:text/plain;charset=utf-8,${encodeURIComponent(summary)}`,
