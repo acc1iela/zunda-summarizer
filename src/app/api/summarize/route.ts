@@ -150,9 +150,10 @@ ${text}
         }
       } catch (err) {
         console.error("[summarize] Stream error:", err);
-      } finally {
-        controller.close();
+        controller.error(err);
+        return;
       }
+      controller.close();
     },
   });
 
