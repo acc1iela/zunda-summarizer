@@ -66,7 +66,13 @@ async function writeSummaryCacheEntry(key: string, summary: string): Promise<voi
 // --- End Cache ---
 
 export async function POST(req: NextRequest) {
-  const { title, text } = await req.json();
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "リクエストの形式が正しくないのだ" }, { status: 400 });
+  }
+  const { title, text } = body as { title?: unknown; text?: unknown };
 
   if (!isNonEmptyString(text)) {
     return NextResponse.json({ error: "テキストが必要なのだ" }, { status: 400 });

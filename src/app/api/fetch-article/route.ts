@@ -67,7 +67,13 @@ async function writeCacheEntry(
 }
 
 export async function POST(req: NextRequest) {
-  const { url } = await req.json();
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "リクエストの形式が正しくないのだ" }, { status: 400 });
+  }
+  const { url } = body as { url?: unknown };
 
   if (!isNonEmptyString(url)) {
     return NextResponse.json({ error: "URLが必要なのだ" }, { status: 400 });

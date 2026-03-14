@@ -97,7 +97,13 @@ const MAX_SPEAK_LENGTH = 500;
 const VOICEVOX_TIMEOUT_MS = 30_000;
 
 export async function POST(req: NextRequest) {
-  const { text } = await req.json();
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "リクエストの形式が正しくないのだ" }, { status: 400 });
+  }
+  const { text } = body as { text?: unknown };
 
   if (!isNonEmptyString(text)) {
     return NextResponse.json({ error: "テキストが必要なのだ" }, { status: 400 });
