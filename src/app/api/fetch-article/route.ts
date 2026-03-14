@@ -93,6 +93,24 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  // SSRF対策: ループバック・プライベートアドレスへのリクエストをブロック
+  const hostname = parsedUrl.hostname;
+  const isPrivate =
+    hostname === "localhost" ||
+    hostname === "::1" ||
+    /^127\./.test(hostname) ||
+    /^10\./.test(hostname) ||
+    /^192\.168\./.test(hostname) ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(hostname) ||
+    /^169\.254\./.test(hostname) ||
+    hostname === "0.0.0.0";
+  if (isPrivate) {
+    return NextResponse.json(
+      { error: "アクセスが許可されていないURLなのだ" },
+      { status: 400 }
+    );
+  }
+
   const cached = await readCacheEntry(url);
   if (cached) {
     return NextResponse.json({ title: cached.title, text: cached.text });
