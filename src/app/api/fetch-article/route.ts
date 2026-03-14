@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { JSDOM } from "jsdom";
 import { Readability } from "@mozilla/readability";
@@ -23,7 +24,7 @@ const cacheDirReady = fs.mkdir(CACHE_DIR, { recursive: true }).catch((err) => {
 const memoryCache = new Map<string, CacheEntry>();
 
 function urlToCacheKey(url: string): string {
-  return Buffer.from(url).toString("base64url") + ".json";
+  return crypto.createHash("sha256").update(url).digest("base64url") + ".json";
 }
 
 async function readCacheEntry(url: string): Promise<CacheEntry | null> {
