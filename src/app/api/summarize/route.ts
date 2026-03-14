@@ -14,6 +14,9 @@ const MODEL = process.env.OLLAMA_MODEL ?? "gemma3:4b";
 
 const OLLAMA_TIMEOUT_MS = 120_000;
 
+const MAX_TITLE_LENGTH = 200;
+const MAX_TEXT_LENGTH = 8000;
+
 // --- 要約キャッシュ（L1: メモリ / L2: ファイル、TTL 1時間） ---
 const SUMMARY_CACHE_TTL_MS = 60 * 60 * 1000;
 const SUMMARY_CACHE_DIR = path.join(os.tmpdir(), "zunda-summarizer-summary-cache");
@@ -78,7 +81,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "テキストが必要なのだ" }, { status: 400 });
   }
 
-  const cacheKey = toSummaryCacheKey(title ?? "", text);
+  const safeTitle = isNonEmptyString(title) ? title.slice(0, MAX_TITLE_LENGTH) : "";
+  const safeText = text.slice(0, MAX_TEXT_LENGTH);
+
+  const cacheKey = toSummaryCacheKey(safeTitle, safeText);
   const cached = await readSummaryCacheEntry(cacheKey);
   if (cached) {
     // キャッシュヒット: テキストストリームとして返す（クライアント側の読み方を統一するため）
@@ -91,9 +97,9 @@ export async function POST(req: NextRequest) {
 以下の技術記事を、ずんだもんの口調で3〜5文に要約してください。
 専門用語はそのまま使い、わかりやすく説明してください。日本語で答えてください。
 
-記事タイトル: ${title ?? "不明"}
+記事タイトル: ${safeTitle || "不明"}
 記事内容:
-${text}
+${safeText}
 
 要約（ずんだもんの口調で）:`;
 
