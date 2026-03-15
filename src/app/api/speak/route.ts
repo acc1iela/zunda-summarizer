@@ -10,7 +10,8 @@ const VOICEVOX_BASE = process.env.VOICEVOX_BASE_URL ?? "http://localhost:50021";
 // --- 音声キャッシュ（L1: メモリ / L2: バイナリファイル、TTL 24時間） ---
 // 同じテキストの音声合成は結果が一定なので長めのTTLを設定する
 const SPEAK_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
-const SPEAK_CACHE_DIR = path.join(os.tmpdir(), "zunda-summarizer-speak-cache");
+const CACHE_BASE_DIR = process.env.CACHE_DIR ?? os.tmpdir();
+const SPEAK_CACHE_DIR = path.join(CACHE_BASE_DIR, "zunda-summarizer-speak-cache");
 type SpeakCacheEntry = { buffer: Buffer; expiresAt: number };
 
 const speakCacheDirReady = fs.mkdir(SPEAK_CACHE_DIR, { recursive: true }).catch((err) => {

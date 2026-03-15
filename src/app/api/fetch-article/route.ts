@@ -12,7 +12,8 @@ const MAX_TEXT_LENGTH = 8000;
 
 // 同一URLの再フェッチを避けるためのファイルキャッシュ（5分TTL、サーバー再起動後も有効）
 const CACHE_TTL_MS = 5 * 60 * 1000;
-const CACHE_DIR = path.join(os.tmpdir(), "zunda-summarizer-cache");
+const CACHE_BASE_DIR = process.env.CACHE_DIR ?? os.tmpdir();
+const CACHE_DIR = path.join(CACHE_BASE_DIR, "zunda-summarizer-cache");
 type CacheEntry = { title: string; text: string; expiresAt: number };
 
 // キャッシュディレクトリはモジュール初期化時に一度だけ作成する

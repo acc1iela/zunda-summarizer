@@ -19,7 +19,8 @@ const MAX_TEXT_LENGTH = 8000;
 
 // --- 要約キャッシュ（L1: メモリ / L2: ファイル、TTL 1時間） ---
 const SUMMARY_CACHE_TTL_MS = 60 * 60 * 1000;
-const SUMMARY_CACHE_DIR = path.join(os.tmpdir(), "zunda-summarizer-summary-cache");
+const CACHE_BASE_DIR = process.env.CACHE_DIR ?? os.tmpdir();
+const SUMMARY_CACHE_DIR = path.join(CACHE_BASE_DIR, "zunda-summarizer-summary-cache");
 type SummaryCacheEntry = { summary: string; expiresAt: number };
 
 const summaryCacheDirReady = fs.mkdir(SUMMARY_CACHE_DIR, { recursive: true }).catch((err) => {
