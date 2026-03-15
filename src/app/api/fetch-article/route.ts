@@ -21,7 +21,15 @@ const cacheDirReady = fs.mkdir(CACHE_DIR, { recursive: true }).catch((err) => {
 });
 
 // L1: プロセス内メモリキャッシュ（ファイルI/Oを省略するための高速レイヤー）
+const MEMORY_CACHE_MAX_SIZE = 100;
 const memoryCache = new Map<string, CacheEntry>();
+
+// Map の挿入順を利用した LRU eviction（外部ライブラリ不要）
+function lruSet<V>(map: Map<string, V>, key: string, value: V, maxSize: number): void {
+  if (map.has(key)) map.delete(key);
+  map.set(key, value);
+  if (map.size > maxSize) map.delete(map.keys().next().value!);
+}
 
 function urlToCacheKey(url: string): string {
   return crypto.createHash("sha256").update(url).digest("base64url") + ".json";
@@ -44,7 +52,7 @@ async function readCacheEntry(url: string): Promise<CacheEntry | null> {
       await fs.unlink(filePath).catch(() => {}); // 期限切れは削除
       return null;
     }
-    memoryCache.set(url, entry); // L1 に昇格して次回以降の I/O を省略
+    lruSet(memoryCache, url, entry, MEMORY_CACHE_MAX_SIZE); // L1 に昇格して次回以降の I/O を省略
     return entry;
   } catch {
     return null; // ファイルが存在しない or パースエラー
@@ -56,7 +64,7 @@ async function writeCacheEntry(
   data: { title: string; text: string }
 ): Promise<void> {
   const entry: CacheEntry = { ...data, expiresAt: Date.now() + CACHE_TTL_MS };
-  memoryCache.set(url, entry); // L1 にも即時保存
+  lruSet(memoryCache, url, entry, MEMORY_CACHE_MAX_SIZE); // L1 にも即時保存
 
   const filePath = path.join(CACHE_DIR, urlToCacheKey(url));
   try {

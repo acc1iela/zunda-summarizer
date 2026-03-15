@@ -17,7 +17,15 @@ const speakCacheDirReady = fs.mkdir(SPEAK_CACHE_DIR, { recursive: true }).catch(
   console.warn("[speak] キャッシュディレクトリの作成に失敗:", err);
 });
 
+const MEMORY_CACHE_MAX_SIZE = 100;
 const speakMemoryCache = new Map<string, SpeakCacheEntry>();
+
+// Map の挿入順を利用した LRU eviction（外部ライブラリ不要）
+function lruSet<V>(map: Map<string, V>, key: string, value: V, maxSize: number): void {
+  if (map.has(key)) map.delete(key);
+  map.set(key, value);
+  if (map.size > maxSize) map.delete(map.keys().next().value!);
+}
 
 function toSpeakCacheKey(text: string): string {
   return crypto.createHash("sha256").update(text).digest("hex");
@@ -38,7 +46,7 @@ async function readSpeakCache(key: string): Promise<Buffer | null> {
       return null;
     }
     const buffer = await fs.readFile(filePath);
-    speakMemoryCache.set(key, { buffer, expiresAt });
+    lruSet(speakMemoryCache, key, { buffer, expiresAt }, MEMORY_CACHE_MAX_SIZE);
     return buffer;
   } catch {
     return null;
@@ -46,7 +54,7 @@ async function readSpeakCache(key: string): Promise<Buffer | null> {
 }
 
 async function writeSpeakCache(key: string, buffer: Buffer): Promise<void> {
-  speakMemoryCache.set(key, { buffer, expiresAt: Date.now() + SPEAK_CACHE_TTL_MS });
+  lruSet(speakMemoryCache, key, { buffer, expiresAt: Date.now() + SPEAK_CACHE_TTL_MS }, MEMORY_CACHE_MAX_SIZE);
   const filePath = path.join(SPEAK_CACHE_DIR, key + ".wav");
   try {
     await speakCacheDirReady;

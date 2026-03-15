@@ -26,7 +26,15 @@ const summaryCacheDirReady = fs.mkdir(SUMMARY_CACHE_DIR, { recursive: true }).ca
   console.warn("[summarize] キャッシュディレクトリの作成に失敗:", err);
 });
 
+const MEMORY_CACHE_MAX_SIZE = 100;
 const summaryMemoryCache = new Map<string, SummaryCacheEntry>();
+
+// Map の挿入順を利用した LRU eviction（外部ライブラリ不要）
+function lruSet<V>(map: Map<string, V>, key: string, value: V, maxSize: number): void {
+  if (map.has(key)) map.delete(key);
+  map.set(key, value);
+  if (map.size > maxSize) map.delete(map.keys().next().value!);
+}
 
 function toSummaryCacheKey(title: string, text: string): string {
   return (
@@ -48,7 +56,7 @@ async function readSummaryCacheEntry(key: string): Promise<string | null> {
       await fs.unlink(filePath).catch(() => {});
       return null;
     }
-    summaryMemoryCache.set(key, entry);
+    lruSet(summaryMemoryCache, key, entry, MEMORY_CACHE_MAX_SIZE);
     return entry.summary;
   } catch {
     return null;
